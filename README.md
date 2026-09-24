@@ -79,6 +79,13 @@ Usage
     window.open(endpoint, '_self', 'oauth=yes');
     ```
 
+    On iOS 13 and newer, an ephemeral authentication session can be requested
+    by including `ephemeral=yes` in the window features:
+
+    ```javascript
+    var endpoint = 'https://accounts.google.com/o/oauth2/v2/auth?....';
+    window.open(endpoint, 'oauth:google', 'ephemeral=yes');
+
 2.  The plugin will open the OAuth login page in a new browser window.
 
 3.  When the OAuth process is complete and it redirects to your app scheme, the

@@ -169,9 +169,50 @@ class OAuthPluginTests: XCTestCase {
         OAuthPlugin.forcedVersion = 12
         plugin.pluginInitialize()
 
-        let cmd = CDVInvokedUrlCommand(arguments:["https://example.com"], callbackId:"", className:"CDVOAuthPlugin", methodName:"startOAuth")
+        let cmd = CDVInvokedUrlCommand(
+            arguments: ["https://example.com"],
+            callbackId: "",
+            className: "CDVOAuthPlugin",
+            methodName: "startOAuth"
+        )
+
         plugin.startOAuth(cmd!)
 
-        XCTAssertTrue(plugin.authSystem is ASWebAuthenticationSessionOAuthSessionProvider)
+        XCTAssertTrue(
+            plugin.authSystem is ASWebAuthenticationSessionOAuthSessionProvider
+        )
+
+        if #available(iOS 13.0, *) {
+            let provider =
+                plugin.authSystem as! ASWebAuthenticationSessionOAuthSessionProvider
+
+            XCTAssertFalse(provider.prefersEphemeralWebBrowserSession)
+        }
+    }
+    
+    func testASWebAuthenticationSessionProviderEphemeral() throws {
+        guard #available(iOS 13.0, *) else {
+            throw XCTSkip("Only for iOS 13+")
+        }
+
+        OAuthPlugin.forcedVersion = 12
+        plugin.pluginInitialize()
+
+        let cmd = CDVInvokedUrlCommand(
+            arguments: ["https://example.com", true],
+            callbackId: "",
+            className: "CDVOAuthPlugin",
+            methodName: "startOAuth"
+        )
+
+        plugin.startOAuth(cmd!)
+
+        guard let provider =
+            plugin.authSystem as? ASWebAuthenticationSessionOAuthSessionProvider else {
+            XCTFail("Expected ASWebAuthenticationSessionOAuthSessionProvider")
+            return
+        }
+
+        XCTAssertTrue(provider.prefersEphemeralWebBrowserSession)
     }
 }

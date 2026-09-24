@@ -39,6 +39,16 @@ class ASWebAuthenticationSessionOAuthSessionProvider : OAuthSessionProvider {
 
     var delegate : AnyObject?
 
+    @available(iOS 13.0, *)
+    var prefersEphemeralWebBrowserSession: Bool {
+        get {
+            return self.aswas.prefersEphemeralWebBrowserSession
+        }
+        set {
+            self.aswas.prefersEphemeralWebBrowserSession = newValue
+        }
+    }
+
     required init(_ endpoint : URL, callbackScheme : String) {
         let url: URL = URL(string: callbackScheme)!
         let callbackURLScheme: String = url.scheme ?? callbackScheme
@@ -174,6 +184,9 @@ class OAuthPlugin : CDVPlugin, SFSafariViewControllerDelegate, ASWebAuthenticati
             return
         }
 
+        let prefersEphemeralWebBrowserSession =
+            (command.argument(at: 1) as? NSNumber)?.boolValue ?? false
+
         self.closeCallbackId = command.callbackId
 
         if OAuthPlugin.forcedVersion >= 12, #available(iOS 12.0, *) {
@@ -182,6 +195,8 @@ class OAuthPlugin : CDVPlugin, SFSafariViewControllerDelegate, ASWebAuthenticati
             if #available(iOS 13.0, *) {
                 if let aswas = self.authSystem as? ASWebAuthenticationSessionOAuthSessionProvider {
                     aswas.delegate = self
+                    aswas.prefersEphemeralWebBrowserSession =
+                        prefersEphemeralWebBrowserSession
                 }
             }
         } else if OAuthPlugin.forcedVersion >= 11, #available(iOS 11.0, *) {

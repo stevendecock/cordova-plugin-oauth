@@ -106,6 +106,8 @@ var EventTargetPolyfill = (function(Object, wm) {
 module.exports = function(url, name, features) {
   var nameMatch = name && name.match && name.match(/^oauth:/);
   var featureMatch = features && features.match && features.match(/^(?:.+,)?(oauth)(?:[=,].*)?$/i);
+  var ephemeralMatch = features && features.match &&
+      features.match(/(?:^|,)\s*ephemeral\s*=\s*(?:yes|true|1)\s*(?:,|$)/i);
 
   if (nameMatch || featureMatch) {
     var wnd = null;
@@ -124,7 +126,7 @@ module.exports = function(url, name, features) {
       }
     }
 
-    cordova.exec(success, noop, 'OAuth', 'startOAuth', [url]);
+    cordova.exec(success, noop, 'OAuth', 'startOAuth', [url, !!ephemeralMatch]);
 
     return wnd;
   } else {
