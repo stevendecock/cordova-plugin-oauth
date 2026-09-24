@@ -84,7 +84,8 @@ Usage
 
     ```javascript
     var endpoint = 'https://accounts.google.com/o/oauth2/v2/auth?....';
-    window.open(endpoint, 'oauth:google', 'ephemeral=yes');
+    window.open(endpoint, '_self', 'oauth=yes,ephemeral=yes');
+    ```
 
 2.  The plugin will open the OAuth login page in a new browser window.
 
