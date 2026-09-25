@@ -127,6 +127,7 @@ public class OAuthPlugin extends CordovaPlugin {
         LOG.i(TAG, "onNewIntent: uri.scheme = " + uri.getScheme());
         LOG.i(TAG, "onNewIntent: uri.host = " + uri.getHost());
         LOG.i(TAG, "onNewIntent: callbackHost = " + callbackHost);
+        LOG.i(TAG, "onNewIntent: callbackScheme = " + callbackScheme);
         LOG.i(TAG, "onNewIntent: didFinishLoading = " + this.didFinishLoading);
 
         boolean schemeMatches =
@@ -182,7 +183,7 @@ public class OAuthPlugin extends CordovaPlugin {
                 e.printStackTrace();
             }
         } else {
-            LOG.i(TAG, "onNewIntent: callback host did NOT match");
+            LOG.i(TAG, "onNewIntent: callback URI did NOT match configured scheme/host");
         }
     }
 
