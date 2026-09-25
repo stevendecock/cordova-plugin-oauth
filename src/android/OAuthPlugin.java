@@ -1,6 +1,11 @@
 /**
  * Copyright 2019 - 2022 Ayogo Health Inc.
  *
+ * Modifications Copyright 2026 Steven Decock
+ *
+ * Modified from the original Ayogo implementation to support
+ * OAuth callback intents whose action is changed by host frameworks.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -66,9 +71,6 @@ public class OAuthPlugin extends CordovaPlugin {
             try {
                 String authEndpoint = args.getString(0);
 
-                LOG.i(TAG, "execute: startOAuth called");
-                LOG.i(TAG, "execute: didFinishLoading = " + this.didFinishLoading);
-
                 oauthCallback = callbackContext;
 
                 this.startOAuth(authEndpoint);
@@ -102,33 +104,16 @@ public class OAuthPlugin extends CordovaPlugin {
      */
     @Override
     public void onNewIntent(Intent intent) {
-        LOG.i(TAG, "onNewIntent ENTERED");
-        LOG.i(TAG, "onNewIntent: intent = " + intent);
-
-        if (intent != null) {
-            LOG.i(TAG, "onNewIntent: action = " + intent.getAction());
-            LOG.i(TAG, "onNewIntent: data = " + intent.getData());
-        }
-
         if (intent == null) {
-            LOG.i(TAG, "onNewIntent: returning because intent is null");
             return;
         }
 
         final Uri uri = intent.getData();
         if (uri == null) {
-            LOG.i(TAG, "onNewIntent: returning because URI is null");
             return;
         }
         String callbackScheme = preferences.getString("oauthscheme", "");
         String callbackHost = preferences.getString("oauthhostname", "oauth_callback");
-
-        LOG.i(TAG, "onNewIntent: uri = " + uri);
-        LOG.i(TAG, "onNewIntent: uri.scheme = " + uri.getScheme());
-        LOG.i(TAG, "onNewIntent: uri.host = " + uri.getHost());
-        LOG.i(TAG, "onNewIntent: callbackHost = " + callbackHost);
-        LOG.i(TAG, "onNewIntent: callbackScheme = " + callbackScheme);
-        LOG.i(TAG, "onNewIntent: didFinishLoading = " + this.didFinishLoading);
 
         boolean schemeMatches =
             uri.getScheme() != null &&
@@ -137,9 +122,6 @@ public class OAuthPlugin extends CordovaPlugin {
         boolean hostMatches =
             uri.getHost() != null &&
             uri.getHost().equalsIgnoreCase(callbackHost);
-
-        LOG.i(TAG, "onNewIntent: schemeMatches = " + schemeMatches);
-        LOG.i(TAG, "onNewIntent: hostMatches = " + hostMatches);
 
         if (schemeMatches && hostMatches) {
                 LOG.i(TAG, "OAuth called back with parameters.");
@@ -167,23 +149,14 @@ public class OAuthPlugin extends CordovaPlugin {
                     jsobj.put(queryKey, uri.getQueryParameter(queryKey));
                 }
 
-                LOG.i(TAG, "onNewIntent: OAuth callback parsed");
-                LOG.i(TAG, "onNewIntent: didFinishLoading = " + this.didFinishLoading);
-
-                // ORIGINAL AYOGO 4.1.0 LOGIC — unchanged
                 if (this.didFinishLoading) {
-                    LOG.i(TAG, "onNewIntent: calling dispatchOAuthMessage");
                     dispatchOAuthMessage(jsobj.toString());
                 } else {
-                    LOG.i(TAG, "onNewIntent: storing result in lastOAuthResult");
                     this.lastOAuthResult = jsobj.toString();
                 }
             } catch (JSONException e) {
-                LOG.e(TAG, "JSON Serialization failed");
                 e.printStackTrace();
             }
-        } else {
-            LOG.i(TAG, "onNewIntent: callback URI did NOT match configured scheme/host");
         }
     }
 
@@ -195,14 +168,9 @@ public class OAuthPlugin extends CordovaPlugin {
      */
     @Override
     public void onResume(boolean multitasking) {
-        LOG.i(TAG, "onResume ENTERED");
-        LOG.i(TAG, "onResume: oauthCallback present = " + (oauthCallback != null));
-
         super.onResume(multitasking);
 
         if (oauthCallback != null) {
-            LOG.i(TAG, "onResume: sending OAuth window-close callback");
-
             oauthCallback.sendPluginResult(
                 new PluginResult(PluginResult.Status.OK)
             );
@@ -219,18 +187,10 @@ public class OAuthPlugin extends CordovaPlugin {
      */
     @Override
     public Object onMessage(String id, Object data) {
-        LOG.i(TAG, "onMessage: id = " + id);
-
         if (id.equals("onPageFinished")) {
-            LOG.i(TAG, "onMessage: onPageFinished received");
-
             this.didFinishLoading = true;
 
-            LOG.i(TAG, "onMessage: lastOAuthResult present = " + (this.lastOAuthResult != null));
-
             if (this.lastOAuthResult != null) {
-                LOG.i(TAG, "onMessage: dispatching buffered OAuth result");
-
                 this.dispatchOAuthMessage(this.lastOAuthResult);
                 this.lastOAuthResult = null;
             }
@@ -262,8 +222,6 @@ public class OAuthPlugin extends CordovaPlugin {
 
     @SuppressWarnings("deprecation")
     private void dispatchOAuthMessage(final String msg) {
-        LOG.i(TAG, "dispatchOAuthMessage ENTERED");
-
         final String msgData = msg.replace("'", "\\'").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t");
         final String jsCode = "window.dispatchEvent(new MessageEvent('message', { data: 'oauth::" + msgData + "' }));";
 
