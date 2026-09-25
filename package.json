@@ -1,11 +1,12 @@
 {
   "name": "cordova-plugin-oauth",
-  "version": "4.1.0",
+  "version": "4.1.0-karimba.1",
   "author": "Ayogo Health Inc. <info@ayogo.com>",
   "contributors": [
     "Darryl Pogue <darryl@dpogue.ca>",
     "Charalampos Pournaris <charpour@gmail.com>",
-    "Harel Mazor"
+    "Harel Mazor",
+    "Steven Decock"
   ],
   "description": "Cordova plugin for performing OAuth login flows.",
   "license": "Apache-2.0",
