@@ -110,12 +110,17 @@ public class OAuthPlugin extends CordovaPlugin {
             LOG.i(TAG, "onNewIntent: data = " + intent.getData());
         }
 
-        if (intent == null || !intent.getAction().equals(Intent.ACTION_VIEW)) {
-            LOG.i(TAG, "onNewIntent: returning because intent is null or action is not ACTION_VIEW");
+        if (intent == null) {
+            LOG.i(TAG, "onNewIntent: returning because intent is null");
             return;
         }
 
         final Uri uri = intent.getData();
+        if (uri == null) {
+            LOG.i(TAG, "onNewIntent: returning because URI is null");
+            return;
+        }
+        String callbackScheme = preferences.getString("oauthscheme", "");
         String callbackHost = preferences.getString("oauthhostname", "oauth_callback");
 
         LOG.i(TAG, "onNewIntent: uri = " + uri);
@@ -124,9 +129,19 @@ public class OAuthPlugin extends CordovaPlugin {
         LOG.i(TAG, "onNewIntent: callbackHost = " + callbackHost);
         LOG.i(TAG, "onNewIntent: didFinishLoading = " + this.didFinishLoading);
 
-        // ORIGINAL AYOGO 4.1.0 CONDITION — unchanged
-        if (uri.getHost().equals(callbackHost)) {
-            LOG.i(TAG, "OAuth called back with parameters.");
+        boolean schemeMatches =
+            uri.getScheme() != null &&
+            uri.getScheme().equalsIgnoreCase(callbackScheme);
+
+        boolean hostMatches =
+            uri.getHost() != null &&
+            uri.getHost().equalsIgnoreCase(callbackHost);
+
+        LOG.i(TAG, "onNewIntent: schemeMatches = " + schemeMatches);
+        LOG.i(TAG, "onNewIntent: hostMatches = " + hostMatches);
+
+        if (schemeMatches && hostMatches) {
+                LOG.i(TAG, "OAuth called back with parameters.");
 
             try {
                 JSONObject jsobj = new JSONObject();
