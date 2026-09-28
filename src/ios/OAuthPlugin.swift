@@ -152,11 +152,32 @@ class OAuthPlugin : CDVPlugin, SFSafariViewControllerDelegate, ASWebAuthenticati
     var callbackScheme : String?
     var logger : OSLog?
 
+    private let debugLogKey = "OAuthPluginDebugLog"
+
+    private func debug(_ message: String) {
+        let line = "\(Date()): \(message)"
+
+        var messages = UserDefaults.standard.stringArray(forKey: debugLogKey) ?? []
+        messages.append(line)
+
+        if messages.count > 100 {
+            messages.removeFirst(messages.count - 100)
+        }
+
+        UserDefaults.standard.set(messages, forKey: debugLogKey)
+
+        NSLog("OAuthPlugin: %@", message)
+    }
+
     override func pluginInitialize() {
         let urlScheme = self.commandDelegate.settings["oauthscheme"] as! String
         let urlHostname = self.commandDelegate.settings["oauthhostname"] as? String ?? "oauth_callback";
 
         self.callbackScheme = "\(urlScheme)://\(urlHostname)"
+
+        self.debug("pluginInitialize")
+        self.debug("callbackScheme = \(self.callbackScheme ?? "(nil)")")
+
         if #available(iOS 10.0, *) {
             self.logger = OSLog(subsystem: urlScheme, category: "Cordova")
         }
@@ -187,6 +208,10 @@ class OAuthPlugin : CDVPlugin, SFSafariViewControllerDelegate, ASWebAuthenticati
         let prefersEphemeralWebBrowserSession =
             (command.argument(at: 1) as? NSNumber)?.boolValue ?? false
 
+        self.debug("startOAuth called")
+        self.debug("auth endpoint = \(authEndpoint)")
+        self.debug("ephemeral = \(prefersEphemeralWebBrowserSession)")
+
         self.closeCallbackId = command.callbackId
 
         if OAuthPlugin.forcedVersion >= 12, #available(iOS 12.0, *) {
@@ -212,13 +237,44 @@ class OAuthPlugin : CDVPlugin, SFSafariViewControllerDelegate, ASWebAuthenticati
             self.authSystem = SafariAppOAuthSessionProvider(url, callbackScheme:self.callbackScheme!)
         }
 
+        self.debug("Starting OAuth authentication session")
         self.authSystem?.start()
 
         return
     }
 
+    @objc func getDebugLog(_ command: CDVInvokedUrlCommand) {
+        let messages =
+            UserDefaults.standard.stringArray(forKey: debugLogKey) ?? []
+
+        let log = messages.joined(separator: "\n")
+
+        let result = CDVPluginResult(
+            status: .ok,
+            messageAs: log
+        )
+
+        self.commandDelegate.send(
+            result,
+            callbackId: command.callbackId
+        )
+    }
+
+    @objc func clearDebugLog(_ command: CDVInvokedUrlCommand) {
+        UserDefaults.standard.removeObject(forKey: debugLogKey)
+
+        let result = CDVPluginResult(status: .ok)
+
+        self.commandDelegate.send(
+            result,
+            callbackId: command.callbackId
+        )
+    }
 
     internal func parseToken(from url: URL) {
+        self.debug("parseToken entered")
+        self.debug("parseToken URL = \(url.absoluteString)")
+
         self.authSystem?.cancel()
         self.authSystem = nil
 
@@ -252,6 +308,8 @@ class OAuthPlugin : CDVPlugin, SFSafariViewControllerDelegate, ASWebAuthenticati
                                .replacingOccurrences(of: "\r", with: "\\r")
                                .replacingOccurrences(of: "\t", with: "\\t")
 
+                self.debug("parseToken: dispatching oauth message to WebView")               
+
                 self.webViewEngine.evaluateJavaScript("window.dispatchEvent(new MessageEvent('message', { data: 'oauth::\(jsMsg)' }));", completionHandler: nil)
             }
         } catch {
@@ -265,23 +323,48 @@ class OAuthPlugin : CDVPlugin, SFSafariViewControllerDelegate, ASWebAuthenticati
     }
 
     @objc internal func _handleOpenURL(_ notification: NSNotification) {
+        self.debug("_handleOpenURL entered")
+
+        guard let url = notification.object as? URL else {
+            self.debug("_handleOpenURL: notification did not contain a URL")
+            return
+        }
+
+        self.debug("_handleOpenURL: received URL = \(url.absoluteString)")
+        self.debug("_handleOpenURL: expected callback = \(self.callbackScheme ?? "(nil)")")
+
         guard
-            let url = notification.object as? URL,
             let callbackScheme = self.callbackScheme,
             let expectedUrl = URL(string: callbackScheme),
             let actualScheme = url.scheme,
             let expectedScheme = expectedUrl.scheme,
             let actualHost = url.host,
-            let expectedHost = expectedUrl.host,
+            let expectedHost = expectedUrl.host
+        else {
+            self.debug("_handleOpenURL: unable to extract scheme or host")
+            return
+        }
+
+        self.debug("_handleOpenURL: actual scheme = \(actualScheme)")
+        self.debug("_handleOpenURL: expected scheme = \(expectedScheme)")
+        self.debug("_handleOpenURL: actual host = \(actualHost)")
+        self.debug("_handleOpenURL: expected host = \(expectedHost)")
+
+        guard
             actualScheme.caseInsensitiveCompare(expectedScheme) == .orderedSame,
             actualHost.caseInsensitiveCompare(expectedHost) == .orderedSame
         else {
+            self.debug("_handleOpenURL: callback scheme/host did NOT match")
             return
         }
+
+        self.debug("_handleOpenURL: callback matched")
 
         self.parseToken(from: url)
 
         if let cb = self.closeCallbackId {
+            self.debug("_handleOpenURL: sending Cordova success callback")
+
             self.commandDelegate.send(
                 CDVPluginResult(status: .ok),
                 callbackId: cb
@@ -297,7 +380,6 @@ class OAuthPlugin : CDVPlugin, SFSafariViewControllerDelegate, ASWebAuthenticati
         }
         self.closeCallbackId = nil
     }
-
 
     @available(iOS 9.0, *)
     func safariViewControllerDidFinish(_ controller: SFSafariViewController) {
