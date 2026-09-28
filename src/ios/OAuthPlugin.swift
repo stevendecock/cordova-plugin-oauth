@@ -264,24 +264,32 @@ class OAuthPlugin : CDVPlugin, SFSafariViewControllerDelegate, ASWebAuthenticati
         }
     }
 
-
-    @objc internal func _handleOpenURL(_ notification : NSNotification) {
-        guard let url = notification.object as? URL else {
-            return
-        }
-
-        if !url.absoluteString.hasPrefix(self.callbackScheme!) {
+    @objc internal func _handleOpenURL(_ notification: NSNotification) {
+        guard
+            let url = notification.object as? URL,
+            let callbackScheme = self.callbackScheme,
+            let expectedUrl = URL(string: callbackScheme),
+            let actualScheme = url.scheme,
+            let expectedScheme = expectedUrl.scheme,
+            let actualHost = url.host,
+            let expectedHost = expectedUrl.host,
+            actualScheme.caseInsensitiveCompare(expectedScheme) == .orderedSame,
+            actualHost.caseInsensitiveCompare(expectedHost) == .orderedSame
+        else {
             return
         }
 
         self.parseToken(from: url)
 
         if let cb = self.closeCallbackId {
-            self.commandDelegate.send(CDVPluginResult(status: .ok), callbackId: cb)
+            self.commandDelegate.send(
+                CDVPluginResult(status: .ok),
+                callbackId: cb
+            )
         }
+
         self.closeCallbackId = nil
     }
-
 
     @objc internal func _handleCancel(_ notification : NSNotification) {
         if let cb = self.closeCallbackId {
