@@ -24,6 +24,7 @@ limitations under the License.
 
   <preference name="URL_SCHEME" default="$PACKAGE_NAME" />
   <preference name="URL_HOSTNAME" default="oauth_callback" />
+  <preference name="IOS_DEBUG_LOGGING" default="false" />
 
   <engines>
     <engine name="cordova-ios" version=">= 6.1.0" />
@@ -37,6 +38,7 @@ limitations under the License.
   <config-file target="config.xml" parent="/*">
     <preference name="OAuthScheme" value="$URL_SCHEME"/>
     <preference name="OAuthHostname" value="$URL_HOSTNAME"/>
+    <preference name="OAuthDebugLogging" value="$IOS_DEBUG_LOGGING"/>
   </config-file>
 
   <platform name="ios">

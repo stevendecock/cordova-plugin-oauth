@@ -153,8 +153,13 @@ class OAuthPlugin : CDVPlugin, SFSafariViewControllerDelegate, ASWebAuthenticati
     var logger : OSLog?
 
     private let debugLogKey = "OAuthPluginDebugLog"
+    private var debugLoggingEnabled = false
 
     private func debug(_ message: String) {
+        guard self.debugLoggingEnabled else {
+            return
+        }
+
         let line = "\(Date()): \(message)"
 
         var messages = UserDefaults.standard.stringArray(forKey: debugLogKey) ?? []
@@ -172,8 +177,18 @@ class OAuthPlugin : CDVPlugin, SFSafariViewControllerDelegate, ASWebAuthenticati
     override func pluginInitialize() {
         let urlScheme = self.commandDelegate.settings["oauthscheme"] as! String
         let urlHostname = self.commandDelegate.settings["oauthhostname"] as? String ?? "oauth_callback";
+        let debugLogging = self.commandDelegate.settings["oauthdebuglogging"] as? String ?? "false"
+
+        self.debugLoggingEnabled =
+        debugLogging.caseInsensitiveCompare("true") == .orderedSame ||
+        debugLogging.caseInsensitiveCompare("yes") == .orderedSame ||
+        debugLogging == "1"
 
         self.callbackScheme = "\(urlScheme)://\(urlHostname)"
+
+        if !self.debugLoggingEnabled {
+            UserDefaults.standard.removeObject(forKey: debugLogKey)
+        }
 
         self.debug("pluginInitialize")
         self.debug("callbackScheme = \(self.callbackScheme ?? "(nil)")")
@@ -244,6 +259,19 @@ class OAuthPlugin : CDVPlugin, SFSafariViewControllerDelegate, ASWebAuthenticati
     }
 
     @objc func getDebugLog(_ command: CDVInvokedUrlCommand) {
+        guard self.debugLoggingEnabled else {
+            let result = CDVPluginResult(
+                status: .ok,
+                messageAs: "OAuth debug logging is disabled."
+            )
+
+            self.commandDelegate.send(
+                result,
+                callbackId: command.callbackId
+            )
+            return
+        }
+
         let messages =
             UserDefaults.standard.stringArray(forKey: debugLogKey) ?? []
 
