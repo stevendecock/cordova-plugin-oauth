@@ -53,6 +53,31 @@ then your OAuth redirect URL should be `mycoolapp://oauth_callback`.
 The hostname endpoint can be changed by providing a `URL_HOSTNAME` variable
 when installing.
 
+> ⚠️ **Experimental branch: `experiment/android-host-callback-routing`**
+>
+> This branch is an experiment, not a confirmed fix. On Android it does
+> **not** add an intent-filter for the OAuth callback URL. It is intended for
+> host apps (such as OutSystems apps) that already have their own deep-link
+> handler for the app's URL scheme, to avoid Android showing a chooser with
+> two entries for the same callback.
+>
+> On Android, the host app must therefore do both of the following, or OAuth
+> callbacks may never reach the plugin:
+>
+> 1. Declare an intent-filter that matches the callback URL
+>    (`URL_SCHEME://URL_HOSTNAME`).
+> 2. Deliver that callback URL as the data of an Intent to the Cordova
+>    activity that hosts this plugin (by starting/resuming that activity with
+>    it). The plugin reads the URL from the activity's launch intent
+>    (`onStart`) or from `onNewIntent`. The Intent's action does not need to
+>    be `ACTION_VIEW`; only the URL's scheme and host are checked.
+>
+> Do not add a second callback intent-filter to the Cordova activity if the
+> host already handles the scheme; that recreates the duplicate chooser.
+> Whether a particular host framework forwards the URL this way has to be
+> verified on a device. Switching to or from this branch requires a new
+> Android binary build. iOS behaviour is unchanged.
+
 
 Supported Platforms
 -------------------

@@ -17,16 +17,26 @@
 package com.ayogo.cordova.oauth;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 import android.content.Intent;
 import android.net.Uri;
+import java.util.Collections;
 import org.apache.cordova.CallbackContext;
-import org.apache.cordova.CordovaArgs;
+import org.apache.cordova.CordovaInterface;
+import org.apache.cordova.CordovaPreferences;
+import org.apache.cordova.CordovaWebView;
+import org.apache.cordova.CordovaWebViewEngine;
 import org.apache.cordova.PluginResult;
 import org.json.JSONException;
-import org.json.JSONObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
@@ -61,51 +71,86 @@ public class OAuthPluginUnitTest {
     }
 
     @Test
-    public void callbackWithMatchingSchemeAndHost() throws JSONException {
-        OAuthPlugin plugin = new OAuthPlugin();
-        plugin.preferences.set("oauthscheme", "testscheme");
-        plugin.preferences.set("oauthhostname", "testhost");
+    public void callbackReceivedBeforePageLoadIsDispatchedAfterPageFinished() {
+        CordovaWebView webView = mock(CordovaWebView.class);
+        CordovaWebViewEngine engine = mock(CordovaWebViewEngine.class);
+        when(webView.getEngine()).thenReturn(engine);
+        OAuthPlugin plugin = createPlugin(webView);
 
-        // Create an Intent with matching scheme and host
-        Intent intent = new Intent();
-        intent.setData(Uri.parse("testscheme://testhost?code=abc123&state=xyz"));
+        plugin.onNewIntent(callbackIntent(mockCallbackUri("testscheme://testhost?code=abc123")));
+        verify(engine, never()).evaluateJavascript(any(), any());
 
-        // Call onNewIntent to process the callback
-        plugin.onNewIntent(intent);
+        plugin.onMessage("onPageFinished", null);
 
-        // Verify that the plugin processes the intent successfully
-        // (No exception should be thrown, and the method should handle the URI)
+        String js = captureDispatchedJavascript(engine);
+        assertTrue(js, js.contains("oauth::"));
+        assertTrue(js, js.contains("\"code\":\"abc123\""));
     }
 
     @Test
-    public void callbackWithMismatchedScheme() throws JSONException {
-        OAuthPlugin plugin = new OAuthPlugin();
-        plugin.preferences.set("oauthscheme", "testscheme");
-        plugin.preferences.set("oauthhostname", "testhost");
+    public void callbackIntentWithNonViewActionIsDispatched() {
+        CordovaWebView webView = mock(CordovaWebView.class);
+        CordovaWebViewEngine engine = mock(CordovaWebViewEngine.class);
+        when(webView.getEngine()).thenReturn(engine);
+        OAuthPlugin plugin = createPlugin(webView);
+        plugin.onMessage("onPageFinished", null);
 
-        // Create an Intent with mismatched scheme
-        Intent intent = new Intent();
-        intent.setData(Uri.parse("wrongscheme://testhost?code=abc123"));
+        // Host frameworks may forward the callback with an action other than ACTION_VIEW.
+        Intent intent = callbackIntent(mockCallbackUri("testscheme://testhost?code=abc123"));
+        lenient().when(intent.getAction()).thenReturn(Intent.ACTION_MAIN);
 
-        // Call onNewIntent - should not process
         plugin.onNewIntent(intent);
 
-        // No exception should be thrown
+        String js = captureDispatchedJavascript(engine);
+        assertTrue(js, js.contains("\"code\":\"abc123\""));
     }
 
     @Test
-    public void callbackWithIntentActionNotView() throws JSONException {
+    public void callbackWithOtherSchemeIsIgnored() {
+        CordovaWebView webView = mock(CordovaWebView.class);
+        OAuthPlugin plugin = createPlugin(webView);
+        plugin.onMessage("onPageFinished", null);
+
+        Uri uri = mock(Uri.class);
+        when(uri.getScheme()).thenReturn("otherscheme");
+        when(uri.getHost()).thenReturn("testhost");
+
+        plugin.onNewIntent(callbackIntent(uri));
+
+        verifyNoInteractions(webView);
+    }
+
+    private static OAuthPlugin createPlugin(CordovaWebView webView) {
+        CordovaPreferences preferences = new CordovaPreferences();
+        preferences.set("OAuthScheme", "testscheme");
+        preferences.set("OAuthHostname", "testhost");
+
         OAuthPlugin plugin = new OAuthPlugin();
-        plugin.preferences.set("oauthscheme", "testscheme");
-        plugin.preferences.set("oauthhostname", "testhost");
+        plugin.privateInitialize("OAuth", mock(CordovaInterface.class), webView, preferences);
+        return plugin;
+    }
 
-        // Create an Intent with ACTION_SEND instead of ACTION_VIEW
-        Intent intent = new Intent(Intent.ACTION_SEND);
-        intent.setData(Uri.parse("testscheme://testhost?code=abc123"));
+    // android.net.Uri is a stub in local unit tests, so the parsed parts are mocked.
+    private static Uri mockCallbackUri(String url) {
+        Uri uri = mock(Uri.class);
+        when(uri.getScheme()).thenReturn("testscheme");
+        when(uri.getHost()).thenReturn("testhost");
+        when(uri.getFragment()).thenReturn(null);
+        when(uri.getQueryParameterNames()).thenReturn(Collections.singleton("code"));
+        when(uri.getQueryParameter("code")).thenReturn("abc123");
+        when(uri.toString()).thenReturn(url);
+        return uri;
+    }
 
-        // onNewIntent should still extract and process the URI
-        plugin.onNewIntent(intent);
+    private static Intent callbackIntent(Uri uri) {
+        Intent intent = mock(Intent.class);
+        when(intent.getData()).thenReturn(uri);
+        return intent;
+    }
 
-        // No exception should be thrown - callback should be processed
+    private static String captureDispatchedJavascript(CordovaWebViewEngine engine) {
+        ArgumentCaptor<String> js = ArgumentCaptor.forClass(String.class);
+        verify(engine).evaluateJavascript(js.capture(), isNull());
+        return js.getValue();
     }
 }
